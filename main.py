@@ -49,7 +49,6 @@ class VideoDownloaderGUI:
         self.root.geometry("500x200")
         self.root.resizable(False, False)
         
-        # Create main frame
         main_frame = ttk.Frame(root, padding="10")
         main_frame.grid(row=0, column=0, sticky="nsew")
         
@@ -66,9 +65,15 @@ class VideoDownloaderGUI:
         self.clear_button = ttk.Button(url_frame, text="Clear", command=self.clear_url)
         self.clear_button.grid(row=0, column=1)
         
-        # Download button
-        self.download_button = ttk.Button(main_frame, text="Download", command=self.start_download)
-        self.download_button.grid(row=2, column=0, pady=(0, 10))
+        # Download buttons
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.grid(row=2, column=0, pady=(0, 10))
+        
+        self.download_button = ttk.Button(buttons_frame, text="Download", command=self.start_video_download)
+        self.download_button.grid(row=0, column=0, padx=(0, 10))
+        
+        self.mp3_button = ttk.Button(buttons_frame, text="MP3 Only", command=self.start_audio_download)
+        self.mp3_button.grid(row=0, column=1)
         
         # Progress bar
         self.progress_var = tk.DoubleVar()
@@ -89,29 +94,50 @@ class VideoDownloaderGUI:
     def clear_url(self):
         self.url_var.set("")
     
-    def start_download(self):
+    def start_video_download(self):
         url = self.url_var.get().strip()
-        if not url:
-            messagebox.showerror("Error", "URL cannot be empty")
+        if not self.validate_url(url):
             return
         
-        if not url.startswith("http"):
-            messagebox.showerror("Error", "Invalid URL format. Must start with 'http' or 'https'")
-            return
-        
-        # Disable download button during download
+        # Disable buttons during download
         self.download_button.config(state="disabled")
-        self.status_var.set("Downloading...")
+        self.mp3_button.config(state="disabled")
+        self.status_var.set("Downloading video...")
         self.progress_var.set(0)
         
-        # Start download in separate thread
-        download_thread = threading.Thread(target=self.download_video_gui, args=(url,))
+        # Start video download in separate thread
+        download_thread = threading.Thread(target=self.download_video_gui, args=(url, False))
         download_thread.daemon = True
         download_thread.start()
     
-    def download_video_gui(self, url):
+    def start_audio_download(self):
+        url = self.url_var.get().strip()
+        if not self.validate_url(url):
+            return
+        
+        self.download_button.config(state="disabled")
+        self.mp3_button.config(state="disabled")
+        self.status_var.set("Downloading audio...")
+        self.progress_var.set(0)
+        
+        download_thread = threading.Thread(target=self.download_video_gui, args=(url, True))
+        download_thread.daemon = True
+        download_thread.start()
+    
+    def validate_url(self, url):
+        if not url:
+            messagebox.showerror("Error", "URL cannot be empty")
+            return False
+        
+        if not url.startswith("http"):
+            messagebox.showerror("Error", "Invalid URL format. Must start with 'http' or 'https'")
+            return False
+        
+        return True
+    
+    def download_video_gui(self, url, audio_only=False):
         try:
-            self.download_video_with_progress(url)
+            self.download_video_with_progress(url, audio_only)
             self.root.after(0, self.download_complete)
         except Exception as e:
             self.root.after(0, self.download_error, str(e))
@@ -120,9 +146,10 @@ class VideoDownloaderGUI:
         self.status_var.set("Download completed successfully!")
         self.progress_var.set(100)
         self.download_button.config(state="normal")
+        self.mp3_button.config(state="normal")
         messagebox.showinfo("Success", "Download completed successfully!")
     
-    def download_video_with_progress(self, url):
+    def download_video_with_progress(self, url, audio_only=False):
         # Get system Downloads folder
         downloads_path = str(Path.home() / "Downloads")
         
@@ -135,22 +162,39 @@ class VideoDownloaderGUI:
                     progress = (d['downloaded_bytes'] / d['total_bytes_estimate']) * 100
                     self.root.after(0, lambda: self.progress_var.set(progress))
         
-        ydl_opts = {
-            'format': 'best',
-            'outtmpl': os.path.join(downloads_path, '%(title)s.%(ext)s'),
-            'noplaylist': True,
-            'progress_hooks': [progress_hook],
-        }
+        if audio_only:
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': os.path.join(downloads_path, '%(title)s_audio.%(ext)s'),
+                'noplaylist': True,
+                'progress_hooks': [progress_hook],
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+                'postprocessor_args': ['-ar', '44100'],
+            }
+            download_type = "audio"
+        else:
+            ydl_opts = {
+                'format': 'best',
+                'outtmpl': os.path.join(downloads_path, '%(title)s.%(ext)s'),
+                'noplaylist': True,
+                'progress_hooks': [progress_hook],
+            }
+            download_type = "video"
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            logging.info(f"Starting download from URL: {url}")
+            logging.info(f"Starting {download_type} download from URL: {url}")
             ydl.download([url])
-            logging.info(f"Video downloaded successfully from URL: {url}")
+            logging.info(f"{download_type.capitalize()} downloaded successfully from URL: {url}")
     
     def download_error(self, error_msg):
         self.status_var.set("Download failed")
         self.progress_var.set(0)
         self.download_button.config(state="normal")
+        self.mp3_button.config(state="normal")
         logging.error(f"Download failed: {error_msg}")
         messagebox.showerror("Download Error", f"An error occurred: {error_msg}")
 
@@ -158,4 +202,5 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = VideoDownloaderGUI(root)
     root.mainloop()
+    
 # This is now a GUI-based video downloader using yt-dlp with tkinter interface.

@@ -1,3 +1,9 @@
 yt-dlp==2023.7.6
 requests>=2.31.0  # For URL validation
 python-dotenv>=1.0.0  # For environment variables
+
+# Note: FFmpeg is required for MP3 audio extraction
+# Install separately using your system package manager:
+# Windows: winget install FFmpeg
+ # Linux: sudo apt install ffmpeg
+# macOS: brew install ffmpeg
