@@ -1,5 +1,7 @@
 # AutoPosting Video Downloader
 
+![alt text](image.png)
+
 A Python-based video downloader with Tkinter GUI that enables easy video and audio downloads from various platforms using yt-dlp. Features dual download modes, real-time progress tracking, URL validation, pop-up error handling, automatic downloads to system Downloads folder, and comprehensive logging for download history.
 
 ## Features
