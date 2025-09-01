@@ -1,4 +1,4 @@
-# AutoPosting Video Downloader
+# Youtube Video Downloader
 
 ![alt text](image.png)
 
